@@ -1,0 +1,176 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+# Template retrieves from AWS Cloudformation Example - ch4331@nyu.edu
+AWSTemplateFormatVersion: 2010-09-09
+
+Resources:
+  # Create an S3 Bucket for logs.
+  ImageBuilderLogBucket:
+    Type: AWS::S3::Bucket
+
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Metadata:
+      Comment: Role to be used by instance during image build.
+    Properties:
+      ManagedPolicyArns:
+        - Fn::Sub: arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore
+        - Fn::Sub: arn:${AWS::Partition}:iam::aws:policy/EC2InstanceProfileForImageBuilder
+        - Fn::Sub: arn:${AWS::Partition}:iam::aws:policy/AmazonInspectorFullAccess 
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+        Version: '2012-10-17'
+      Path: /executionServiceEC2Role/
+
+  # Policy to allow the instance to write to the S3 bucket (via instance role / instance profile).
+  InstanceRoleLoggingPolicy:
+    Type: AWS::IAM::Policy
+    Metadata:
+      Comment: Allows the instance to save log files to an S3 bucket.
+    Properties:
+      PolicyName: ImageBuilderLogBucketPolicy
+      Roles:
+        - Ref: InstanceRole
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Action:
+              - s3:PutObject
+            Effect: Allow
+            Resource:
+              - Fn::Sub:
+                  - arn:${AWS::Partition}:s3:::${BUCKET}/*
+                  - BUCKET:
+                      Ref: ImageBuilderLogBucket
+
+  # To pass the InstanceRole to an EC2 instance, we need an InstanceProfile.
+  # This profile will be used during the image build process.
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /executionServiceEC2Role/
+      Roles:
+        - Ref: InstanceRole
+
+  AmazonLinux2ImageInfrastructureConfiguration:
+    Type: AWS::ImageBuilder::InfrastructureConfiguration
+    Properties:
+      Name: Amazon-Linux-2-with-latest-SSM-Agent-Infrastructure-Configuration
+      InstanceProfileName:
+        Ref: InstanceProfile
+      # Specify an S3 bucket and EC2 Image Builder will save logs to the bucket.
+      Logging:
+        S3Logs:
+          S3BucketName:
+            Ref: ImageBuilderLogBucket
+            S3KeyPrefix: 'my-imagebuilder-bucket-prefix'
+
+  # The CloudWatch LogGroup for the image build logs is provided to ensure the LogGroup is cleaned up if the stack is deleted.
+  AmazonLinux2LogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      LogGroupName: /aws/imagebuilder/Amazon-Linux-2-with-latest-SSM-Agent
+      RetentionInDays: 3
+
+  # Recipe which references the latest (x.x.x) version of the Amazon Linux 2 AMI).
+  # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-imagebuilder-imagerecipe.html
+  AmazonLinux2ImageRecipe:
+    Type: AWS::ImageBuilder::ImageRecipe
+    Properties:
+      Name: Amazon-Linux-2-with-latest-SSM-Agent
+      Version: 0.0.1
+      ParentImage:
+        Fn::Sub: arn:${AWS::Partition}:imagebuilder:${AWS::Region}:aws:image/amazon-linux-2-x86/x.x.x
+      Components:
+        - ComponentArn:
+            Fn::Sub: arn:${AWS::Partition}:imagebuilder:${AWS::Region}:aws:component/update-linux/x.x.x
+      AdditionalInstanceConfiguration:
+        UserDataOverride:
+          Fn::Base64:
+            Fn::Sub: |
+              #!/bin/bash
+              sudo yum install -y https://s3.${AWS::Region}.amazonaws.com/amazon-ssm-${AWS::Region}/latest/linux_amd64/amazon-ssm-agent.rpm
+
+  AmazonLinux2WithLatestSSMAgent:
+    Type: AWS::ImageBuilder::Image
+    Properties:
+      ImageRecipeArn:
+        Ref: AmazonLinux2ImageRecipe
+      InfrastructureConfigurationArn:
+        Ref: AmazonLinux2ImageInfrastructureConfiguration
+
+  # Create an SSM Parameter Store entry with our resulting ImageId.
+  AmazonLinux2WithLatestSSMAgentParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: Image Id for Amazon Linux 2 with the latest version of the Amazon SSM Agent installed
+      Name: /test/images/AmazonLinux2-LatestSSMAgent
+      Type: String
+      Value:
+        Fn::GetAtt: [AmazonLinux2WithLatestSSMAgent, ImageId]
+
+# Create an Resource Group to group instance with tag "ToBeSCan"
+ResourceGroupForEC2instanceTobeScan:
+  Type: "AWS::Inspector::ResourceGroup"
+  Properties: 
+  ResourceGroupTags: 
+  - Key: "ToBeScan"
+  Value: "ToBeScan"
+
+# Create an Inspector Assessment Target
+Type: AWS::Inspector::AssessmentTarget
+Properties: 
+  AssessmentTargetName: MyAssessmentTarget
+  ResourceGroupArn: 
+    Ref: ResourceGroupForEC2instanceTobeScan
+  
+# Create an AccessmentTemplate
+CVEScan: 
+  Type: AWS::Inspector::AssessmentTemplate
+  Properties: 
+    AssessmentTargetArn:
+      Ref: MyAssessmentTarget
+    AssessmentTemplateName: CVEScan
+    DurationInSeconds: 180
+    RulesPackageArns: 
+      # Common Vulnerabilities and Exposures for US-east-1
+      - "arn:aws:inspector:us-east-1:316112463485:rulespackage/0-gEjTy7T7"
+
+# Create the Lambda Function to create EC2 instance, and trigger inspector assessment runs
+Type: AWS::Lambda::Function
+Properties:
+  Runtime: python3.8
+  # Please change redacted to your aws account, and ensure you have a role with the name "lambda-role" with sufficient permissions
+  Role: arn:aws:iam::REDACTED:role/lambda-role
+  Handler: index.lambda_handler
+  Code:
+    ZipFile: |
+      import json
+      import boto3
+      def lambda_handler(event, context):    
+          ec2 = boto3.client('ec2','us-east-1')
+          inspector = boto3.client('inspector','us-east-1')
+          custom_filter = [{
+          'Name':'tag:AMI', 
+          'Values': ['GoldenAMI']}]
+          # Filter Image created by imagebuilder with tag "GoldenAMI"
+          ec2imageidentifier = ec2.describe_images(Filters=custom_filter)
+          if ec2imageidentifier:
+              for ami in ec2imageidentifier['Images']:
+                  # Retrieve ImageID with tag "GoldenAMI"
+                  ImageID = [tag['Value'] for tag in ami['Tags'] if tag['Key'] == 'GoldenAMI'][0]
+          # Create EC2 instance using AMI ID with tag "GoldenAMI"
+          ec2.run_instances(ImageId=ImageID,InstanceType='t3.small', MinCount=1, MaxCount=5)
+          # Retrieve Inspector assessment's arn
+          TemplateToRun = inspector.list_assessment_templates(filter={'namePattern': 'CVEScan'})
+          # Start Assessment run with target created in CloudFormation
+          inspector.start_assessment_run(assessmentTemplateArn=TemplateToRun)
+  Description: The lambda function that creates an EC2 from patched AMI.
