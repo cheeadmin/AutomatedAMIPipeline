@@ -1,27 +1,15 @@
 import boto3
-import os
 
-def describe_ec2_instances():
-    # Read AWS credentials and region from environment variables
-    aws_access_key_id = os.environ.get('AWS_ACCESS_KEY_ID')
-    aws_secret_access_key = os.environ.get('AWS_SECRET_ACCESS_KEY')
-    region_name = os.environ.get('AWS_DEFAULT_REGION')
+def get_caller_identity():
+    # Create an STS client
+    sts_client = boto3.client('sts')
 
-    # Create a session using your AWS credentials
-    session = boto3.Session(
-        aws_access_key_id=aws_access_key_id,
-        aws_secret_access_key=aws_secret_access_key,
-        region_name=region_name
-    )
+    # Call the get_caller_identity method
+    identity = sts_client.get_caller_identity()
 
-    # Create an EC2 client
-    ec2_client = session.client('ec2')
-
-    # Call describe_instances
-    response = ec2_client.describe_instances()
-
-    # Print the response
-    print(response)
+    return identity
 
 if __name__ == "__main__":
-    describe_ec2_instances()
+    identity_info = get_caller_identity()
+    print("AWS Caller Identity Information:")
+    print(identity_info)
