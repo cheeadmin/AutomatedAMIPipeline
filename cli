@@ -1,2 +1,21 @@
-aws ec2 describe-snapshots --owner-ids self --query 'Snapshots[?StartTime>`2023-09-30`].[SnapshotId,StartTime,Volume
-Size,VolumeId]' --output text > text.txt
+import boto3
+
+def describe_ec2_instances():
+    # Create a session using your AWS credentials
+    session = boto3.Session(
+        aws_access_key_id='YOUR_ACCESS_KEY',
+        aws_secret_access_key='YOUR_SECRET_KEY',
+        region_name='YOUR_REGION'
+    )
+
+    # Create an EC2 client
+    ec2_client = session.client('ec2')
+
+    # Call describe_instances
+    response = ec2_client.describe_instances()
+
+    # Print the response
+    print(response)
+
+if __name__ == "__main__":
+    describe_ec2_instances()
