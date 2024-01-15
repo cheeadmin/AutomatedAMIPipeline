@@ -1,41 +1,31 @@
-provider "aws" {
-  region = "us-east-1"  # You can change this to your desired AWS region
+#!/bin/bash
+
+DIR1="/path/to/first/sosreport"
+DIR2="/path/to/second/sosreport"
+OUTPUT_FILE="differences.txt"
+
+# Ensure output file is empty
+> $OUTPUT_FILE
+
+# Function to compare two directories
+compare_dirs() {
+    for file in $(find $1 -type f); do
+        # Generating relative path
+        relative_path=${file#$1/}
+        file1=$1/$relative_path
+        file2=$2/$relative_path
+
+        if [ -f "$file2" ]; then
+            # Output the differences to the file
+            echo "Comparing: $relative_path" >> $OUTPUT_FILE
+            diff $file1 $file2 >> $OUTPUT_FILE
+            echo "----------------------------------------------------" >> $OUTPUT_FILE
+        else
+            echo "$relative_path exists in $1 but not in $2" >> $OUTPUT_FILE
+        fi
+    done
 }
 
-resource "aws_instance" "example" {
-  ami           = "ami-0c55b159cbfafe1f0"  # Example AMI ID, replace with your desired AMI
-  instance_type = "t2.micro"  # Instance type
+compare_dirs $DIR1 $DIR2
 
-  tags = var.common_tags
-}
-
--- variables.tf
-
-variable "test_tag" {
-  description = "test tags"
-  type        = map(string)
-  default     = {}
-}
-
-variable "test_tag_2" {
-  description = "test tags"
-  type        = map(string)
-  default     = {}
-}
-
-
--- terraform.tfvars
-
-test_tag = {
-  A = "A"
-  B = "B"
-  C = "C"
-}
-
-test_tag_2 = {
-  D = "D"
-  E = "E"
-  F = "F"
-}
-
-
+echo "Comparison complete. Check '$OUTPUT_FILE' for details."
