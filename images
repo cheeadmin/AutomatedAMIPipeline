@@ -1,14 +1,41 @@
 provider "aws" {
-  region = "us-west-2"  # You can change this to your desired AWS region
+  region = "us-east-1"  # You can change this to your desired AWS region
 }
 
 resource "aws_instance" "example" {
   ami           = "ami-0c55b159cbfafe1f0"  # Example AMI ID, replace with your desired AMI
   instance_type = "t2.micro"  # Instance type
 
-  tags = {
-    Name        = "MyEC2Instance"
-    Environment = "Development"
-    // Add more tags as needed
-  }
+  tags = var.common_tags
 }
+
+-- variables.tf
+
+variable "test_tag" {
+  description = "test tags"
+  type        = map(string)
+  default     = {}
+}
+
+variable "test_tag_2" {
+  description = "test tags"
+  type        = map(string)
+  default     = {}
+}
+
+
+-- terraform.tfvars
+
+test_tag = {
+  A = "A"
+  B = "B"
+  C = "C"
+}
+
+test_tag_2 = {
+  D = "D"
+  E = "E"
+  F = "F"
+}
+
+
