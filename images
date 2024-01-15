@@ -1,31 +1,19 @@
 #!/bin/bash
 
-DIR1="/path/to/first/sosreport"
-DIR2="/path/to/second/sosreport"
-OUTPUT_FILE="differences.txt"
+SEARCH_DIR="/path/to/sosreport"  # Replace with your sosreport directory path
+SEARCH_STRING="umac-64-etm@openssh.com"
+OUTPUT_FILE="found_files.txt"
 
-# Ensure output file is empty
+# Ensure the output file is empty
 > $OUTPUT_FILE
 
-# Function to compare two directories
-compare_dirs() {
-    for file in $(find $1 -type f); do
-        # Generating relative path
-        relative_path=${file#$1/}
-        file1=$1/$relative_path
-        file2=$2/$relative_path
-
-        if [ -f "$file2" ]; then
-            # Output the differences to the file
-            echo "Comparing: $relative_path" >> $OUTPUT_FILE
-            diff $file1 $file2 >> $OUTPUT_FILE
-            echo "----------------------------------------------------" >> $OUTPUT_FILE
-        else
-            echo "$relative_path exists in $1 but not in $2" >> $OUTPUT_FILE
-        fi
+# Function to search string in directory
+search_string_in_dir() {
+    for file in $(grep -Rl "$SEARCH_STRING" "$SEARCH_DIR"); do
+        echo $file >> $OUTPUT_FILE
     done
 }
 
-compare_dirs $DIR1 $DIR2
-
-echo "Comparison complete. Check '$OUTPUT_FILE' for details."
+echo "Searching for '$SEARCH_STRING' in $SEARCH_DIR..."
+search_string_in_dir
+echo "Search complete. Check '$OUTPUT_FILE' for filenames."
