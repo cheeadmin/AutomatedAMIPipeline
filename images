@@ -1,1 +1,16 @@
-aws ec2 describe-images --owners self --query 'Images[?CreationDate<`2023-09-30`]' --output text > ami.txt
+import redis
+
+# Your Redis server's host name, port, and auth token
+host = 'your_redis_server_host'
+port = 6379  # default Redis port
+auth_token = 'your_auth_token'
+
+# Create a Redis connection
+redis_conn = redis.StrictRedis(host=host, port=port, password=auth_token, ssl=True)
+
+# Test the connection
+try:
+    response = redis_conn.ping()
+    print(f"Redis ping response: {response}")
+except redis.exceptions.ConnectionError as e:
+    print(f"Connection failed: {e}")
