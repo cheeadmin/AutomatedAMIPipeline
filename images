@@ -1,16 +1,14 @@
-import redis
+provider "aws" {
+  region = "us-west-2"  # You can change this to your desired AWS region
+}
 
-# Your Redis server's host name, port, and auth token
-host = 'your_redis_server_host'
-port = 6379  # default Redis port
-auth_token = 'your_auth_token'
+resource "aws_instance" "example" {
+  ami           = "ami-0c55b159cbfafe1f0"  # Example AMI ID, replace with your desired AMI
+  instance_type = "t2.micro"  # Instance type
 
-# Create a Redis connection
-redis_conn = redis.StrictRedis(host=host, port=port, password=auth_token, ssl=True)
-
-# Test the connection
-try:
-    response = redis_conn.ping()
-    print(f"Redis ping response: {response}")
-except redis.exceptions.ConnectionError as e:
-    print(f"Connection failed: {e}")
+  tags = {
+    Name        = "MyEC2Instance"
+    Environment = "Development"
+    // Add more tags as needed
+  }
+}
