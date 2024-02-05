@@ -1,14 +1,15 @@
 #!/bin/bash
 
-# Calculate the end time by adding 60 seconds (1 minute) to the current time
+# First command with its own 60-second duration
 end=$((SECONDS+60))
-
 while [ $SECONDS -lt $end ]; do
-    # Query Amazon's NTP server and write to sntp_amazon_result.txt
     sudo sntp 169.254.169.123 > sntp_amazon_result.txt 2>&1
-    
-    # Query Apple's NTP server and write to sntp_apple_result.txt
+    sleep 1
+done
+
+# Reset the timer for the second command
+end=$((SECONDS+60))
+while [ $SECONDS -lt $end ]; do
     sudo sntp time.apple.com > sntp_apple_result.txt 2>&1
-    
     sleep 1
 done
