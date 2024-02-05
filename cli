@@ -1,15 +1,14 @@
-import boto3
+#!/bin/bash
 
-def get_caller_identity():
-    # Create an STS client
-    sts_client = boto3.client('sts')
+# Calculate the end time by adding 60 seconds (1 minute) to the current time
+end=$((SECONDS+60))
 
-    # Call the get_caller_identity method
-    identity = sts_client.get_caller_identity()
-
-    return identity
-
-if __name__ == "__main__":
-    identity_info = get_caller_identity()
-    print("AWS Caller Identity Information:")
-    print(identity_info)
+while [ $SECONDS -lt $end ]; do
+    # Query Amazon's NTP server and write to sntp_amazon_result.txt
+    sudo sntp 169.254.169.123 > sntp_amazon_result.txt 2>&1
+    
+    # Query Apple's NTP server and write to sntp_apple_result.txt
+    sudo sntp time.apple.com > sntp_apple_result.txt 2>&1
+    
+    sleep 1
+done
