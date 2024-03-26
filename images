@@ -1,19 +1,28 @@
-#!/bin/bash
+import boto3
+import logging
+from boto3.s3.transfer import TransferConfig
 
-SEARCH_DIR="/path/to/sosreport"  # Replace with your sosreport directory path
-SEARCH_STRING="umac-64-etm@openssh.com"
-OUTPUT_FILE="found_files.txt"
+# Constants
+GB = 1024 ** 3
 
-# Ensure the output file is empty
-> $OUTPUT_FILE
+# Transfer Configuration
+config = TransferConfig(
+    multipart_threshold=5*GB,  # Use multipart transfers for files over 5GB
+    max_bandwidth=1*GB,        # Limit bandwidth to 1GB per second
+    max_concurrency=30,        # Allow up to 30 threads for multipart transfers
+    use_threads=True           # Enable threading for transfers
+)
 
-# Function to search string in directory
-search_string_in_dir() {
-    for file in $(grep -Rl "$SEARCH_STRING" "$SEARCH_DIR"); do
-        echo $file >> $OUTPUT_FILE
-    done
-}
+# Enable debug logging
+boto3.set_stream_logger('', logging.DEBUG)
 
-echo "Searching for '$SEARCH_STRING' in $SEARCH_DIR..."
-search_string_in_dir
-echo "Search complete. Check '$OUTPUT_FILE' for filenames."
+# Create an S3 client
+s3 = boto3.client('s3')
+
+# Upload the file
+s3.upload_file(
+    Filename='test_file',  # Local filename
+    Bucket='somebucket',   # Name of the S3 bucket
+    Key='test_file',       # The name of the object in S3
+    Config=config          # Pass the transfer configuration
+)
